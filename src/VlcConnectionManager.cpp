@@ -106,6 +106,12 @@ bool VlcConnectionManager::sendNext(nlohmann::json& outPayload) const
     
     return sendGetRequest(target, outPayload);
 }
+bool VlcConnectionManager::sendSstepBack(nlohmann::json& outPayload) const
+{
+    auto const target = "/requests/status.json?command=seek&val=-5S";
+
+    return sendGetRequest(target, outPayload);
+}
 
 bool VlcConnectionManager::sendPrevious(nlohmann::json& outPayload) const
 {

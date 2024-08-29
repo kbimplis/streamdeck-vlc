@@ -22,6 +22,10 @@
     "Name": "Next", 
     "Tooltip": "Jump to next track."
   },
+  "com.rgpaul.vlc.sstepback": {
+    "Name": "Short Step -",
+    "Tooltip": "Jump to next track."
+  },
   "com.rgpaul.vlc.prev": {
     "Name": "Previous", 
     "Tooltip": "Jump to previous track."

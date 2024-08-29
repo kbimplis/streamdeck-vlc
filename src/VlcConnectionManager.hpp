@@ -75,6 +75,9 @@ public:
 	 * @return true on success and and false on failure
 	 */
 	bool sendNext(nlohmann::json& outPayload) const;
+	
+	/* Custom command to small step back */
+	bool sendSstepBack(nlohmann::json& outPayload) const;
 
 	/*!
 	 * @brief send prev command to vlc server

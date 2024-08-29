@@ -75,6 +75,7 @@ private:
 	void keyPressedPause(const nlohmann::json& inPayload);
 	void keyPressedPlayPause(const nlohmann::json& inPayload);
 	void keyPressedNext(const nlohmann::json& inPayload);
+	void keyPressedSstepBack(const nlohmann::json& inPayload);
 	void keyPressedPrevious(const nlohmann::json& inPayload);
 	void keyPressedVolumeUp(const nlohmann::json& inPayload);
 	void keyPressedVolumeDown(const nlohmann::json& inPayload);

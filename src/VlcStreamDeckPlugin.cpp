@@ -110,6 +110,10 @@ void VlcStreamDeckPlugin::KeyDownForAction(const std::string& inAction, const st
 	{
 		keyPressedVolumeDown(inPayload);
 	}
+	        else if (inAction == "com.rgpaul.vlc.sstepback")
+        {
+                keyPressedSstepBack(inPayload);
+        }
 }
 
 void VlcStreamDeckPlugin::KeyUpForAction(const std::string& inAction, const std::string& inContext,
@@ -269,6 +273,14 @@ void VlcStreamDeckPlugin::keyPressedPlayPause(const nlohmann::json &inPayload)
 		success = _vlcConnectionManager->sendPause(payload);
 
 	processVlcResponse("play/pause", success, payload);
+}
+
+void VlcStreamDeckPlugin::keyPressedSstepBack(const nlohmann::json &inPayload)
+{ //myDEBUG
+        nlohmann::json payload;
+        bool success = _vlcConnectionManager->sendSstepBack(payload);
+
+        processVlcResponse("SstepBack", success, payload);
 }
 
 void VlcStreamDeckPlugin::keyPressedNext(const nlohmann::json &inPayload)
