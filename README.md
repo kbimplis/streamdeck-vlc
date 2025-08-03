@@ -1,6 +1,12 @@
 # Stream Deck VLC Control
 A Stream Deck plugin that lets you remotely control the VLC media player.
 
+## Plugin location on mac
+
+~/Library/Application\ Support/com.elgato.StreamDeck/Plugins
+
+## Install the profile Default with my VLC settings
+
 ## Requirements
 Installed and running [VLC media player](https://www.videolan.org/vlc/).  
 To be able to remotely control the VLC media player, it is required that VLC is running with enabled Webinterface access.
