@@ -59,9 +59,14 @@ private:
 	CallBackTimer* _timer { nullptr };
 	VlcConnectionManager* _vlcConnectionManager { nullptr };
 
-	// we store the number of failed vlc network calls - if the last 5 calls failed, we will stop the update polling so 
-	// we don't drawn the log file
+	// we store the number of failed vlc network calls - after kMaxUnsuccessfullCalls consecutive failures we slow the
+	// polling down to every kRetryTickInterval'th tick instead of stopping it, so we don't drown the log file while
+	// still recovering on our own as soon as the vlc server becomes reachable again
 	uint8_t _lastUnsuccessfullCalls { 0 };
+	uint8_t _ticksSinceLastRetry { 0 };
+
+	static constexpr uint8_t kMaxUnsuccessfullCalls { 5 };
+	static constexpr uint8_t kRetryTickInterval { 10 }; // timer ticks every 3 seconds -> retry every 30 seconds
 
 	VlcStatus _currentStatus;
 

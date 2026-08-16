@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include <chrono>
+#include <cstdint>
 #include <string>
 
 #include <boost/asio.hpp>
@@ -61,12 +63,20 @@ public:
 	bool sendPlay(nlohmann::json& outPayload) const;
 
 	/*!
-	 * @brief send pause command to vlc server
+	 * @brief send pause command to vlc server - this toggles between play and pause
 	 * @param outPayload output parameter for status response payload on success and error payload on failure
-	 * 
+	 *
 	 * @return true on success and and false on failure
 	 */
 	bool sendPause(nlohmann::json& outPayload) const;
+
+	/*!
+	 * @brief send force pause command to vlc server - this always pauses and never resumes playback
+	 * @param outPayload output parameter for status response payload on success and error payload on failure
+	 *
+	 * @return true on success and and false on failure
+	 */
+	bool sendForcePause(nlohmann::json& outPayload) const;
 
 	/*!
 	 * @brief send next command to vlc server
@@ -110,6 +120,12 @@ private:
 	std::string _password;
 
 	int _httpVersion { 11 }; // HTTP 1.1
+
+	// maximum time a single request may take before it is aborted
+	std::chrono::seconds _requestTimeout { 5 };
+
+	// maximum accepted response body size - status.json is a few kilobytes
+	static constexpr std::uint64_t kMaxResponseBodySize { 1024 * 1024 };
 
 	// sends a get request to the given target and writes the output to outPayload, on error the error will be written
 	// into the payload

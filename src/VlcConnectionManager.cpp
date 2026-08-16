@@ -28,6 +28,8 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <websocketpp/base64/base64.hpp>
 
+#include <chrono>
+
 namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http = beast::http;       // from <boost/beast/http.hpp>
 namespace net = boost::asio;        // from <boost/asio.hpp>
@@ -96,7 +98,14 @@ bool VlcConnectionManager::sendPlay(nlohmann::json& outPayload) const
 bool VlcConnectionManager::sendPause(nlohmann::json& outPayload) const
 {
     auto const target = "/requests/status.json?command=pl_pause";
-    
+
+    return sendGetRequest(target, outPayload);
+}
+
+bool VlcConnectionManager::sendForcePause(nlohmann::json& outPayload) const
+{
+    auto const target = "/requests/status.json?command=pl_forcepause";
+
     return sendGetRequest(target, outPayload);
 }
 
@@ -152,29 +161,77 @@ bool VlcConnectionManager::sendGetRequest(const std::string& target, nlohmann::j
 
     try
     {
-        // domain lookup
-        auto const results = resolver.resolve(_host, _port);
-
-        // create connection to the server
-        stream.connect(results);
-
         // create an http get request
         http::request<http::string_body> req { http::verb::get, target, _httpVersion };
         req.set(http::field::host, _host);
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
         req.set(http::field::authorization, authHeader);
-            
-        // send the http request
-        http::write(stream, req);
 
         // a buffer for reading beast messages
         beast::flat_buffer buffer;
 
-        // container for the response
-        http::response<http::string_body> res;
+        // the parser lets us cap the response size - status.json is a few kilobytes, so a megabyte is plenty and
+        // protects us against a misconfigured host that streams an endless body at us
+        http::response_parser<http::string_body> parser;
+        parser.body_limit(kMaxResponseBodySize);
 
-        // receive the http response
-        http::read(stream, buffer, res);
+        beast::error_code failure;
+        bool receivedResponse { false };
+
+        // We drive the request asynchronously and give the whole exchange a single deadline below. The synchronous
+        // beast calls would ignore expires_after() - it only applies to async operations - and a dead host would
+        // block this thread for the operating system's tcp timeout (over a minute) instead.
+        resolver.async_resolve(_host, _port,
+            [&](beast::error_code ec, tcp::resolver::results_type results)
+            {
+                if (ec) { failure = ec; return; }
+
+                stream.expires_after(_requestTimeout);
+                stream.async_connect(results,
+                    [&](beast::error_code ec, tcp::resolver::results_type::endpoint_type)
+                    {
+                        if (ec) { failure = ec; return; }
+
+                        stream.expires_after(_requestTimeout);
+                        http::async_write(stream, req,
+                            [&](beast::error_code ec, std::size_t)
+                            {
+                                if (ec) { failure = ec; return; }
+
+                                stream.expires_after(_requestTimeout);
+                                http::async_read(stream, buffer, parser,
+                                    [&](beast::error_code ec, std::size_t)
+                                    {
+                                        if (ec) { failure = ec; return; }
+                                        receivedResponse = true;
+                                    });
+                            });
+                    });
+            });
+
+        // run the whole exchange with one deadline - run_for returns as soon as there is no more work to do
+        ioc.run_for(_requestTimeout);
+
+        if (!receivedResponse)
+        {
+            // either one of the steps failed or we ran out of time - either way, stop whatever is still pending
+            beast::error_code ignored;
+            stream.socket().close(ignored);
+
+            std::string reason = failure ? failure.message() : std::string("timed out after ")
+                + std::to_string(_requestTimeout.count()) + "s";
+
+            nlohmann::json jsonObject;
+            jsonObject["error"] = true;
+            jsonObject["message"] = "Error connecting to VLC Server.";
+            jsonObject["logMessage"] = std::string("Error connecting to VLC Server: ") + reason;
+
+            outPayload = jsonObject;
+
+            return false;
+        }
+
+        const http::response<http::string_body>& res = parser.get();
 
         if (res.result() == http::status::ok)
         {
@@ -217,13 +274,14 @@ bool VlcConnectionManager::sendGetRequest(const std::string& target, nlohmann::j
             // beast::system_error { ec }
         }
     }
-    catch (beast::system_error& e)
+    // this also catches nlohmann::json::parse_error - a malformed response body must not take the whole plugin down
+    catch (const std::exception& e)
     {
         gotValidResponse = false;
 
         std::string message = "Error connecting to VLC Server.";
         std::string logMessage = std::string("Error connecting to VLC Server: ") + e.what();
-        
+
         nlohmann::json jsonObject;
         jsonObject["error"] = true;
         jsonObject["message"] = message;

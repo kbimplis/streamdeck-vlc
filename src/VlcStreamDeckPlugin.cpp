@@ -61,13 +61,29 @@ void VlcStreamDeckPlugin::UpdateTimer()
 	//
 	// Warning: UpdateTimer() is running in the timer thread
 	//
-	if (mConnectionManager != nullptr &&   // we need a connection to the stream deck
-	   _vlcConnectionManager != nullptr && // we need a connection to the vlc server
-	   _lastUnsuccessfullCalls < 5         // don' flood the log with connection errors (just try some times)
-	   && !_allVisibleContexts.empty())    // we only need to update if there is at least one context visible
+	if (mConnectionManager == nullptr ||    // we need a connection to the stream deck
+	    _vlcConnectionManager == nullptr)   // we need a connection to the vlc server
+		return;
+
+	// we only need to update if there is at least one context visible
+	_visibleContextsMutex.lock();
+	const bool hasVisibleContexts = !_allVisibleContexts.empty();
+	_visibleContextsMutex.unlock();
+
+	if (!hasVisibleContexts)
+		return;
+
+	// after too many consecutive failures we keep polling, but only every kRetryTickInterval'th tick - that keeps the
+	// log readable while still letting the plugin recover once vlc is reachable again
+	if (_lastUnsuccessfullCalls >= kMaxUnsuccessfullCalls)
 	{
-		updateVlcStatus();
+		if (++_ticksSinceLastRetry < kRetryTickInterval)
+			return;
+
+		_ticksSinceLastRetry = 0;
 	}
+
+	updateVlcStatus();
 }
 
 void VlcStreamDeckPlugin::KeyDownForAction(const std::string& inAction, const std::string& inContext,
@@ -215,7 +231,8 @@ void VlcStreamDeckPlugin::updateVlcStatus()
 		// get's the status.json from vlc
 		bool success = _vlcConnectionManager->getStatus(payload);
 
-		if (!success)
+		// don't let the counter wrap around, that would silently re-enable fast polling
+		if (!success && _lastUnsuccessfullCalls < UINT8_MAX)
 			_lastUnsuccessfullCalls++;
 		
 		processVlcResponse("update status", success, payload);
@@ -248,7 +265,7 @@ void VlcStreamDeckPlugin::updateVlcStatus(const nlohmann::json &payload)
 void VlcStreamDeckPlugin::keyPressedPlay(const nlohmann::json &inPayload)
 {
 	nlohmann::json payload;
-	bool success = _vlcConnectionManager->sendPause(payload);
+	bool success = _vlcConnectionManager->sendPlay(payload);
 
 	processVlcResponse("play", success, payload);
 }
@@ -256,7 +273,8 @@ void VlcStreamDeckPlugin::keyPressedPlay(const nlohmann::json &inPayload)
 void VlcStreamDeckPlugin::keyPressedPause(const nlohmann::json &inPayload)
 {
 	nlohmann::json payload;
-	bool success = _vlcConnectionManager->sendPause(payload);
+	// force pause, so a dedicated pause key never resumes playback
+	bool success = _vlcConnectionManager->sendForcePause(payload);
 
 	processVlcResponse("pause", success, payload);
 }
@@ -267,10 +285,11 @@ void VlcStreamDeckPlugin::keyPressedPlayPause(const nlohmann::json &inPayload)
 	int state = EPLJSONUtils::GetIntByName(inPayload, "state");
 	bool success { false };
 
-	if (state == kKeyStatePlay) 
+	// the key state already tells us what to do, so we use the unambiguous commands instead of the pl_pause toggle
+	if (state == kKeyStatePlay)
 		success = _vlcConnectionManager->sendPlay(payload);
 	else
-		success = _vlcConnectionManager->sendPause(payload);
+		success = _vlcConnectionManager->sendForcePause(payload);
 
 	processVlcResponse("play/pause", success, payload);
 }
@@ -326,6 +345,7 @@ void VlcStreamDeckPlugin::processVlcResponse(const std::string& functionName, bo
 	{
 		updateVlcStatus(payload);
 		_lastUnsuccessfullCalls = 0;
+		_ticksSinceLastRetry = 0;
 
 		piPayload["state"] = "Connection Successful";
 		for (const auto context : _allVisibleContexts)
