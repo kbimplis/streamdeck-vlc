@@ -19,7 +19,9 @@
  -----------------------------------------------------------------------------------------------------------------------
 */
 
-var uuid, settings;
+var uuid;
+// start out with an empty object, so a change made before the global settings arrived doesn't throw
+var settings = {};
 
 $SD.on('connected', (jsonObj) => 
 {
@@ -29,7 +31,8 @@ $SD.on('connected', (jsonObj) =>
 
 $SD.on('didReceiveGlobalSettings', (jsonObj) => 
 {
-    settings = jsonObj.payload.settings;
+    // on a fresh install there are no global settings yet, so fall back to an empty object
+    settings = (jsonObj.payload && jsonObj.payload.settings) || {};
     document.getElementById('vlc_host').value = settings.vlcHost || 'localhost';
     document.getElementById('vlc_port').value = settings.vlcPort || '8080';
     document.getElementById('vlc_password').value = settings.vlcPassword || '';
@@ -50,6 +53,10 @@ $SD.on('sendToPropertyInspector', (jsonObj) =>
 
 function saveSettings()
 {
+    // we can't store anything before the plugin told us who we are
+    if (!uuid)
+        return;
+
     const vlcHost = document.getElementById('vlc_host').value;
     const vlcPort = document.getElementById('vlc_port').value;
     const vlcPassword = document.getElementById('vlc_password').value;
