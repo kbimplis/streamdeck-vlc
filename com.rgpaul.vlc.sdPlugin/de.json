@@ -19,19 +19,23 @@
     "Tooltip": "Pausiert die Wiedergabe."
   },
   "com.rgpaul.vlc.next": {
-    "Name": "Next", 
+    "Name": "Nächster Titel",
     "Tooltip": "Zum nächsten Lied springen."
   },
+  "com.rgpaul.vlc.sstepback": {
+    "Name": "Zurückspringen",
+    "Tooltip": "5 Sekunden zurückspringen."
+  },
   "com.rgpaul.vlc.prev": {
-    "Name": "Previous", 
+    "Name": "Vorheriger Titel",
     "Tooltip": "Zum vorherigen Lied springen."
   },
   "com.rgpaul.vlc.volumeup": {
-    "Name": "Volume Up", 
+    "Name": "Lauter",
     "Tooltip": "Lautstärke erhöhen."
   },
   "com.rgpaul.vlc.volumedown": {
-    "Name": "Volume Down", 
-    "Tooltip": "Lautstärke veringern."
+    "Name": "Leiser",
+    "Tooltip": "Lautstärke verringern."
   }
 }
